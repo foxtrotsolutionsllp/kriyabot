@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { resolveAssistantVoice, type AssistantVoiceId } from "@/lib/assistant-voice";
@@ -33,6 +34,7 @@ function friendlyTime(value: string | undefined, zone: string) {
 
 export function AssistantCorner({ userName, initialAssistantName, initialAssistantLanguage }: Props) {
   const [open, setOpen] = useState(true);
+  const [portalReady, setPortalReady] = useState(false);
   const [assistantName, setAssistantName] = useState(initialAssistantName || "Kriyabot Assistant");
   const [inputLanguage, setInputLanguage] = useState<"en-IN" | "hi-IN">(initialAssistantLanguage || "en-IN");
   const voiceRef = useRef<AssistantVoiceId>("india_female_warm");
@@ -46,6 +48,8 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
   const [listening, setListening] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechApi | null>(null);
+
+  useEffect(() => { setPortalReady(true); }, []);
 
   useEffect(() => {
     let alive = true;
@@ -146,7 +150,7 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8v3M5.6 5.6l2.1 2.1M2.8 12h3M18.2 12h3M16.3 7.7l2.1-2.1"/><path d="M8 14a4 4 0 1 1 8 0c0 2-1 2-1 4H9c0-2-1-2-1-4ZM9.5 21h5"/></svg>
       <span className="assistant-corner-label">{assistantName}</span><i aria-hidden="true" />
     </button>
-    {open && <section className="assistant-corner-panel" aria-label={`${assistantName} chat`}>
+    {open && portalReady && createPortal(<section className="assistant-corner-panel" aria-label={`${assistantName} chat`}>
       <header className="assistant-corner-header"><span className="assistant-corner-avatar">✦</span><div><b>{assistantName}</b><small>Your personal assistant · Today in {timezone}</small></div><button aria-label="Close assistant" onClick={() => setOpen(false)}>×</button></header>
       <div className="assistant-corner-agenda"><b>Today’s schedule</b>{agendaLoading ? <small>Checking your calendar…</small> : agenda.length ? <ul>{agenda.slice(0, 5).map((item) => <li key={item.id}><time>{friendlyTime(item.start_at, timezone)}</time><span><b>{item.title}</b><small>{item.kind === "meeting" ? "Meeting" : item.detail || "Task"}{item.detail && item.kind === "meeting" ? ` · ${item.detail}` : ""}</small></span></li>)}</ul> : <p>No special schedule saved today. Enjoy your free day, or ask me to plan something.</p>}</div>
       <div className="assistant-corner-messages" aria-live="polite">
@@ -157,6 +161,6 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
       {error && <p className="assistant-corner-error" role="alert">{error}</p>}
       <form className="assistant-corner-compose" onSubmit={(event) => void send(event)}><textarea aria-label="Ask the assistant" rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder={inputLanguage === "hi-IN" ? "हिन्दी में पूछें…" : "Ask me anything, or ask me to search…"}/><div><button type="button" className="assistant-language-toggle" onClick={() => setInputLanguage(language => language === "en-IN" ? "hi-IN" : "en-IN")} aria-label="Change assistant language">{inputLanguage === "hi-IN" ? "हिन्दी" : "EN"}</button><button type="button" className={`assistant-corner-mic ${listening ? "is-listening" : ""}`} onClick={dictate} aria-label={listening ? "Stop voice input" : "Speak a question"}>{listening ? "Listening…" : "🎙 Speak"}</button><button type="submit" disabled={!draft.trim() || busy} aria-label="Send question">{busy ? "…" : "↑"}</button></div></form>
       <footer className="assistant-corner-footer"><span>Web answers include source links</span><Link href="/app/assistant" onClick={() => setOpen(false)}>Plan a task or meeting →</Link></footer>
-    </section>}
+    </section>, document.body)}
   </div>;
 }

@@ -6,6 +6,6 @@ export async function POST(request: NextRequest) {
   const data = await upstream.json();
   if (!upstream.ok) return NextResponse.json(data, { status: upstream.status });
   const response = NextResponse.json({ is_admin: data.user?.roles?.includes("super_admin") ?? false });
-  response.cookies.set("taskflow_session", data.token, { httpOnly: true, secure: process.env.KRIYABOT_COOKIE_SECURE === "true", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  response.cookies.set("taskflow_session", data.token, { httpOnly: true, secure: process.env.TASKFLOW_COOKIE_SECURE === "true", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
   return response;
 }
