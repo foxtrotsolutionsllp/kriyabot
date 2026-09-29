@@ -1,0 +1,21 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+type Person = { id: number; name: string; email: string | null; timezone: string; locale: string; is_self: boolean };
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
+export default function PeoplePage() {
+  const [people, setPeople] = useState<Person[]>([]); const [query, setQuery] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState<number | null>(null);
+  const load = useCallback(async () => { setLoading(true); try { const response = await fetch(`/api/backend/people?q=${encodeURIComponent(query)}`, { cache: "no-store" }); const data = await response.json(); if (!response.ok) throw new Error(data.message ?? "Unable to load people."); setPeople(data); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Unable to load people."); } finally { setLoading(false); } }, [query]);
+  useEffect(() => { const timer = setTimeout(() => void load(), 180); return () => clearTimeout(timer); }, [load]);
+  async function message(person: Person) { setBusy(person.id); setError(""); try { const response = await fetch("/api/backend/conversations/direct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participant_id: person.id }) }); const data = await response.json(); if (!response.ok) throw new Error(data.message ?? "Couldn’t start a conversation."); window.location.href = `/app/messages/${data.id}`; } catch (e) { setError(e instanceof Error ? e.message : "Couldn’t start a conversation."); setBusy(null); } }
+  return <section className="module-page people-module">
+    <div className="module-heading"><div><p className="eyebrow">YOUR WORKSPACE, AT A GLANCE</p><h1>People</h1><p className="module-subtitle">Find a teammate, see their workspace details, and start a conversation.</p></div><div className="people-total"><span className="people-total-icon">♧</span><span><b>{people.length}</b><small>Visible members</small></span></div></div>
+    {error && <div className="work-alert">{error}</div>}
+    <div className="people-directory-card"><div className="people-directory-toolbar"><div><h2>Workspace directory</h2><p>Approved members with profiles visible to the workspace.</p></div><label className="people-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name" aria-label="Search people"/></label></div>
+      <div className="people-table-scroll"><table className="people-table"><thead><tr><th>MEMBER</th><th>EMAIL</th><th>TIME ZONE</th><th>STATUS</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>
+        {loading ? [1, 2, 3, 4].map(i => <tr className="people-loading-row" key={i}><td colSpan={5}><span/><span/><span/></td></tr>) : people.map(person => <tr key={person.id}><td><div className="directory-person"><span className="person-avatar">{initials(person.name)}</span><span><b>{person.name}</b><small>{person.is_self ? "Your profile" : `Workspace member · ${person.locale || "en"}`}</small></span></div></td><td><span className="directory-email">{person.email ?? <i>Hidden by member</i>}</span></td><td><span className="directory-timezone"><i>◷</i>{person.timezone || "UTC"}</span></td><td><span className="member-status"><i/>Active</span></td><td className="directory-action-cell">{!person.is_self && <button className="directory-message-button" onClick={() => void message(person)} disabled={busy === person.id}><span>✉</span>{busy === person.id ? "Opening…" : "Message"}<b>→</b></button>}{person.is_self && <span className="self-member-label">You</span>}</td></tr>)}
+      </tbody></table></div>
+      {!loading && !people.length && <div className="people-table-empty"><span>⌕</span><b>No members match that search</b><small>Try another name or clear the search.</small></div>}
+      <footer className="people-directory-footer"><span><i/> Member access is active</span><small>Private profiles are not listed. Email visibility follows each member’s profile settings.</small></footer>
+    </div><div className="module-footnote">Directory access is limited to approved, active members in your workspace.</div>
+  </section>;
+}

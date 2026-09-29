@@ -1,0 +1,17 @@
+{
+  "name": "Kriyabot",
+  "short_name": "Kriyabot",
+  "description": "Your work, projects, schedule, and personal AI assistant in one place.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/kriyabot-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function PendingPage() { return <main className="auth-page"><section className="auth-card"><img className="auth-brand-logo" src="/kriyabot-logo.png" alt="Kriyabot" /><h1>Check your inbox</h1><p className="muted">Your account request is recorded. Verify your email, then wait for the Super Admin to review your registration. We’ll notify you when access is approved.</p><Link href="/login">Return to sign in</Link></section></main>; }
