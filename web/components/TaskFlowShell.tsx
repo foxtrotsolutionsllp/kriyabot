@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -82,9 +83,10 @@ export function TaskFlowShell({ children, user }: React.PropsWithChildren<Props>
 
 function NotificationBell({enabled}:{enabled:boolean}) {
   type Item={id:number;title:string;body:string;data?:{url?:string};read_at?:string|null};
-  const [items,setItems]=useState<Item[]>([]),[open,setOpen]=useState(false),[browserEnabled,setBrowserEnabled]=useState(enabled),[pushSubscribed,setPushSubscribed]=useState(false),[pushStatus,setPushStatus]=useState("");
-  const known=useRef(new Set<number>()),initialized=useRef(false),popoverRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{if(!open)return;const closeOutside=(event:PointerEvent)=>{if(!popoverRef.current?.contains(event.target as Node))setOpen(false)};const closeEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false)};document.addEventListener('pointerdown',closeOutside);document.addEventListener('keydown',closeEscape);return()=>{document.removeEventListener('pointerdown',closeOutside);document.removeEventListener('keydown',closeEscape)}},[open]);
+  const [items,setItems]=useState<Item[]>([]),[open,setOpen]=useState(false),[portalReady,setPortalReady]=useState(false),[browserEnabled,setBrowserEnabled]=useState(enabled),[pushSubscribed,setPushSubscribed]=useState(false),[pushStatus,setPushStatus]=useState("");
+  const known=useRef(new Set<number>()),initialized=useRef(false),popoverRef=useRef<HTMLDivElement>(null),popoverPanelRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{setPortalReady(true)},[]);
+  useEffect(()=>{if(!open)return;const closeOutside=(event:PointerEvent)=>{const target=event.target as Node;if(!popoverRef.current?.contains(target)&&!popoverPanelRef.current?.contains(target))setOpen(false)};const closeEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false)};document.addEventListener('pointerdown',closeOutside);document.addEventListener('keydown',closeEscape);return()=>{document.removeEventListener('pointerdown',closeOutside);document.removeEventListener('keydown',closeEscape)}},[open]);
   const subscribeForPush=useCallback(async():Promise<boolean>=>{
     if(!('serviceWorker'in navigator)||!('Notification'in window))return false;
     try{
@@ -119,7 +121,7 @@ function NotificationBell({enabled}:{enabled:boolean}) {
   const unread=items.filter(item=>!item.read_at).length;
   const alertAction=()=>browserEnabled&&pushSubscribed?disableBrowserAlerts():enableBrowserAlerts();
   const alertLabel=!browserEnabled?'Enable alerts':pushSubscribed?'Turn alerts off':'Set up this device';
-  return <div className="notification-bell-wrap" ref={popoverRef}><button className={`notification-bell ${unread?'notification-bell-unread':'notification-bell-clear'}`} aria-label={unread?`${unread} unread notifications`:'No unread notifications'} aria-expanded={open} onClick={()=>setOpen(value=>!value)}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>{unread>0&&<i>{unread>9?'9+':unread}</i>}</button>{open&&<div className="notification-popover"><header><b>Reminders & alerts</b><button onClick={alertAction}>{alertLabel}</button></header>{pushStatus&&<p className="notification-status">{pushStatus}</p>}{items.length?items.slice(0,8).map(item=><a key={item.id} href={item.data?.url??'/app'} className={!item.read_at?'notification-unread':''} onClick={()=>{void fetch(`/api/backend/notifications/${item.id}/read`,{method:'POST'});setItems(old=>old.map(row=>row.id===item.id?{...row,read_at:new Date().toISOString()}:row));setOpen(false)}}><b>{item.title}</b><span>{item.body}</span></a>):<p>No reminders yet. Upcoming task deadlines and meeting alerts will appear here.</p>}</div>}</div>
+  return <div className="notification-bell-wrap" ref={popoverRef}><button className={`notification-bell ${unread?'notification-bell-unread':'notification-bell-clear'}`} aria-label={unread?`${unread} unread notifications`:'No unread notifications'} aria-expanded={open} onClick={()=>setOpen(value=>!value)}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>{unread>0&&<i>{unread>9?'9+':unread}</i>}</button>{open&&portalReady&&createPortal(<div ref={popoverPanelRef} className="notification-popover" role="dialog" aria-label="Reminders and alerts"><header><b>Reminders & alerts</b><button onClick={alertAction}>{alertLabel}</button></header>{pushStatus&&<p className="notification-status">{pushStatus}</p>}{items.length?items.slice(0,8).map(item=><a key={item.id} href={item.data?.url??'/app'} className={!item.read_at?'notification-unread':''} onClick={()=>{void fetch(`/api/backend/notifications/${item.id}/read`,{method:'POST'});setItems(old=>old.map(row=>row.id===item.id?{...row,read_at:new Date().toISOString()}:row));setOpen(false)}}><b>{item.title}</b><span>{item.body}</span></a>):<p>No reminders yet. Upcoming task deadlines and meeting alerts will appear here.</p>}</div>,document.body)}</div>
 }
 
 function decodeVapidKey(value:string):ArrayBuffer{const padding='='.repeat((4-value.length%4)%4);const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');const raw=window.atob(base64);const bytes=Uint8Array.from(raw,character=>character.charCodeAt(0));return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;}
