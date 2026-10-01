@@ -1,6 +1,8 @@
 <?php
 
 return [
+    // Used only by the shared-hosting HTTP scheduler endpoint. Keep this secret private.
+    'scheduler_token' => env('TASKFLOW_SCHEDULER_TOKEN'),
     'ai' => ['api_key' => env('OPENAI_API_KEY'), 'model' => env('OPENAI_MODEL', 'gpt-4.1-mini')],
     'push' => [
         'vapid_public_key' => env('TASKFLOW_VAPID_PUBLIC_KEY'),

@@ -19,9 +19,12 @@ use App\Http\Controllers\Api\V1\AssistantController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\SavedPlaceController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\AutomationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    Route::post('/automation/reminders', [AutomationController::class, 'dispatchReminders'])->middleware('throttle:2,1');
+
     Route::middleware('throttle:auth')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);

@@ -15,6 +15,14 @@ type Props = { userName: string; initialAssistantName?: string; initialAssistant
 type SpeechApi = EventTarget & { lang: string; interimResults: boolean; continuous?: boolean; onresult: ((event: { resultIndex?: number; results: ArrayLike<ArrayLike<{ transcript: string; isFinal?: boolean }>> }) => void) | null; onerror: ((event?: { error?: string }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechApi; webkitSpeechRecognition?: new () => SpeechApi };
 
+function isPlannerCommand(text: string) {
+  const action = /\b(?:add|create|schedule|set(?:\s+up)?|remind|save|write\s+down|note\s+down|record|plan|book|assign)\b/i.test(text)
+    || /(?:जोड़|बनाओ|शेड्यूल|रिमाइंडर|याद दिला|लिख लो|नोट कर|नोट लिख)/u.test(text);
+  const item = /\b(?:task|to[- ]?do|meeting|appointment|reminder|deadline|event|note|project)\b/i.test(text)
+    || /(?:काम|कार्य|मीटिंग|बैठक|नोट|कार्यक्रम|अपॉइंटमेंट)/u.test(text);
+  return (action && item) || /^(?:remind me|note (?:this|down)|write this down)\b/i.test(text.trim());
+}
+
 function greetingFor(zone: string, language: "en-IN" | "hi-IN") {
   const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(new Date()));
   if (language === "hi-IN") {
@@ -130,7 +138,14 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
 
   async function send(event?: FormEvent) {
     event?.preventDefault();
-    await sendQuestion(draft.trim());
+    const question = draft.trim();
+    if (!question || busy) return;
+    if (pendingVoiceCommandRef.current || isPlannerCommand(question)) {
+      setDraft("");
+      await executeVoiceCommand(question);
+      return;
+    }
+    await sendQuestion(question);
   }
 
   function stopVoiceMode() {
@@ -266,6 +281,7 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.message ?? "I couldn't save that task.");
         pendingVoiceCommandRef.current = "";
+        await refreshAgenda();
         answer = inputLanguage === "hi-IN" ? `काम “${draft.title}” सेव कर दिया${project ? ` और ${project.name} प्रोजेक्ट में जोड़ दिया` : ""}।` : `Done. I saved “${draft.title}”${project ? ` in ${project.name}` : ""}${draft.due_at ? ` for ${new Intl.DateTimeFormat(undefined, { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(new Date(draft.due_at))}` : ""}.`;
       } else {
         const place = draft.saved_place_id ? places.find(item => item.id === draft.saved_place_id) : places.find(item => item.name.toLocaleLowerCase() === (draft.location_label ?? "").toLocaleLowerCase());
@@ -280,6 +296,7 @@ export function AssistantCorner({ userName, initialAssistantName, initialAssista
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.message ?? "I couldn't save that meeting.");
           pendingVoiceCommandRef.current = "";
+          await refreshAgenda();
           answer = inputLanguage === "hi-IN" ? `मीटिंग “${draft.title}” कैलेंडर में सेव कर दी है${place ? `, स्थान ${place.name}` : ""}। रिमाइंडर भी सेट है।` : `Done. I added “${draft.title}”${draft.attendee_name ? ` with ${draft.attendee_name}` : ""} to your calendar${place ? ` at ${place.name}` : locationLabel ? ` (${locationLabel})` : ""}, with a reminder.`;
         }
       }

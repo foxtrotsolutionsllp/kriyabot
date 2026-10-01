@@ -105,13 +105,14 @@ class AssistantController extends Controller
         $dayStart=now($timezone)->startOfDay()->utc();
         $dayEnd=now($timezone)->endOfDay()->utc();
         $tasks=Task::where('workspace_id',$user->workspace_id)->where(function(Builder $query)use($dayStart,$dayEnd){
-            $query->whereBetween('start_at',[$dayStart,$dayEnd])->orWhereBetween('due_at',[$dayStart,$dayEnd])->orWhereBetween('completed_at',[$dayStart,$dayEnd])
-                ->orWhere(fn(Builder $overlap)=>$overlap->whereNotNull('start_at')->whereNotNull('due_at')->where('start_at','<=',$dayEnd)->where('due_at','>=',$dayStart));
+            $query->whereBetween('start_at',[$dayStart,$dayEnd])->orWhereBetween('due_at',[$dayStart,$dayEnd])
+                ->orWhere(fn(Builder $overlap)=>$overlap->whereNotNull('start_at')->whereNotNull('due_at')->where('start_at','<=',$dayEnd)->where('due_at','>=',$dayStart))
+                ->orWhere(fn(Builder $overdue)=>$overdue->whereNotNull('due_at')->where('due_at','<',$dayStart)->whereNotIn('status',['done','cancelled']));
         });
         if(!$user->hasRole('workspace_owner'))$tasks->where(fn(Builder $q)=>$q->where('created_by',$user->id)->orWhereHas('assignees',fn(Builder $a)=>$a->where('users.id',$user->id))->orWhereHas('project.members',fn(Builder $m)=>$m->where('users.id',$user->id)));
         $agenda=$tasks->with('project:id,name')->get()->map(fn(Task $task)=>[
             'id'=>'task-'.$task->id,'start_at'=>$task->start_at?->timezone($timezone)->toIso8601String() ?? $task->due_at?->timezone($timezone)->toIso8601String(),
-            'title'=>$task->title,'kind'=>'task','phase'=>$task->status==='done'?'completed':'plan','detail'=>$task->project?->name ?? 'Personal task','status'=>$task->status,
+            'title'=>$task->title,'kind'=>'task','phase'=>$task->status==='done'?'completed':'plan','overdue'=>$task->due_at && $task->due_at->lt(now($timezone)->startOfDay()),'detail'=>$task->project?->name ?? 'Personal task','status'=>$task->status,
         ])->all();
         $meetings=Meeting::where('workspace_id',$user->workspace_id)->where('created_by',$user->id)->where('status','scheduled')->whereBetween('starts_at',[$dayStart,$dayEnd])->get();
         foreach($meetings as $meeting)$agenda[]=['id'=>'meeting-'.$meeting->id,'start_at'=>$meeting->starts_at->timezone($meeting->timezone)->toIso8601String(),'title'=>$meeting->title,'kind'=>'meeting','phase'=>'plan','detail'=>$meeting->attendee_name ? 'With '.$meeting->attendee_name.' · '.($meeting->location_label ?? ucfirst($meeting->location_type)) : ($meeting->location_label ?? ucfirst($meeting->location_type)),'status'=>'scheduled'];
